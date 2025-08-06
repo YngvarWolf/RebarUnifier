@@ -148,7 +148,7 @@ public class GOSTCalculator {
                             r.getZoneName()
                     );
 
-                    System.out.printf("✅ Зона \"%s\" унифицирована: Ø%d, шаг %d мм (%.2f см² ≥ %.2f см²)\n",
+                    System.out.printf("Зона \"%s\" унифицирована: Ø%d, шаг %d мм (%.2f см² ≥ %.2f см²)\n",
                             r.getZoneName(), diameters[diameterIndex], step, area, required);
 
                     updated.add(unified);
