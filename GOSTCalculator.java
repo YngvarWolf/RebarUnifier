@@ -56,14 +56,26 @@ public class GOSTCalculator {
         return steps[match.colIndex];
     }
 
-    public double findWeight(GOSTMatch match) {
+    public double findWeight(GOSTMatch match, double slabLength, double slabWidth, String zoneName) {
         if (match == null || match.rowIndex >= weightPlate.length || match.colIndex >= steps.length)
             return -1;
 
         int stepsColl = steps[match.colIndex];
         double weightPerMeter = weightPlate[match.rowIndex];
 
-        return stepsColl * weightPerMeter;
+        double barLength;
+        double spacingLength;
+
+        if (zoneName.toLowerCase().contains("по x")) {
+            barLength = slabWidth;
+            spacingLength = slabLength;
+        } else {
+            barLength = slabLength;
+            spacingLength = slabWidth;
+        }
+        double totalWeight = (barLength * weightPerMeter) * (spacingLength * stepsColl);
+
+        return totalWeight;
     }
 
     public int findDiameter(GOSTMatch match) {
@@ -71,82 +83,99 @@ public class GOSTCalculator {
         return diameters[match.rowIndex];
     }
 
-    public List<CalculationResult> unifyResultsByDiameter(List<CalculationResult> results, String mode) {
+    public List<CalculationResult> unifyResultsByDiameter(List<CalculationResult> results,
+                                                          String mode, double slabLength, double slabWidth) {
         List<CalculationResult> filtered = new ArrayList<>();
         for (CalculationResult r : results) {
             String zone = r.getZoneName().toLowerCase();
             if (mode.equals("всё") ||
-                    (mode.equals("верх") && zone.contains("верхняя")) ||
-                    (mode.equals("низ") && zone.contains("нижняя"))) {
+                    (mode.equals("верх") && zone.contains("верх")) ||
+                    (mode.equals("низ") && zone.contains("низ"))) {
                 filtered.add(r);
             }
         }
 
+        if (filtered.isEmpty()) {
+            System.out.println("Нет зон для унификации по выбранному режиму: " + mode);
+            return results;
+        }
         int maxDiameter = filtered.stream()
                 .mapToInt(CalculationResult::getDiameter)
                 .max()
                 .orElse(-1);
 
-        int maxRow = -1;
+        if (maxDiameter == -1) {
+            System.out.println("Не удалось определить максимальный диаметр для унификации.");
+            return results;
+        }
+
+        int diameterIndex = -1;
         for (int i = 0; i < diameters.length; i++) {
             if (diameters[i] == maxDiameter) {
-                maxRow = i;
+                diameterIndex = i;
                 break;
             }
         }
 
-        List<CalculationResult> updatedResults = new ArrayList<>();
+        if (diameterIndex == -1) {
+            System.out.println("Диаметр Ø" + maxDiameter + " не найден в справочнике.");
+            return results;
+        }
+
+        List<CalculationResult> updated = new ArrayList<>();
+
         for (CalculationResult r : results) {
             if (!filtered.contains(r)) {
-                updatedResults.add(r);
-                continue;
-            }
-
-            if (r.getDiameter() == maxDiameter) {
-                updatedResults.add(r);
+                updated.add(r);
                 continue;
             }
 
             double required = r.getRequiredArea();
-            double EPSILON = 1e-4;
-            GOSTMatch match = null;
-            for (int j = 0; j < crossSectionalArea[maxRow].length; j++) {
-                double area = crossSectionalArea[maxRow][j];
-                if (area >= required - EPSILON) {
-                    match = new GOSTMatch(area, maxRow, j);
+            boolean found = false;
+
+            for (int j = 0; j < steps.length; j++) {
+                double area = crossSectionalArea[diameterIndex][j];
+                if (area >= required) {
+                    int step = steps[j];
+                    double weight = findWeight(new GOSTMatch(area, diameterIndex, j), slabLength, slabWidth, r.getZoneName());
+
+                    CalculationResult unified = new CalculationResult(
+                            required,
+                            area,
+                            diameters[diameterIndex],
+                            step,
+                            weight,
+                            r.getZoneName()
+                    );
+
+                    System.out.printf("✅ Зона \"%s\" унифицирована: Ø%d, шаг %d мм (%.2f см² ≥ %.2f см²)\n",
+                            r.getZoneName(), diameters[diameterIndex], step, area, required);
+
+                    updated.add(unified);
+                    found = true;
                     break;
                 }
             }
 
-            if (match == null) {
-                updatedResults.add(null);
-            }
-            else {
-                int step = findStep(match);
-                double weight = findWeight(match);
-                double selectedArea = match.value;
-
-                CalculationResult unified = new CalculationResult(
-                        required,
-                        selectedArea,
-                        maxDiameter,
-                        step,
-                        weight,
-                        r.getZoneName()
-                );
-                updatedResults.add(unified);
+            if (!found) {
+                System.out.printf("Зона \"%s\" — невозможно унифицировать на Ø%d: нет подходящего шага\n",
+                        r.getZoneName(), diameters[diameterIndex]);
+                updated.add(r);
             }
         }
-        return updatedResults;
+
+        return updated;
     }
 
-    public CalculationResult calculateResult(double requiredArea, String zoneName, boolean onlyStep100) {
+    public CalculationResult calculateResult(double requiredArea, String zoneName,
+                                             boolean onlyStep100,
+                                             double slabLength, double slabWidth) {
         GOSTMatch match = findGreaterOrEqual(requiredArea, onlyStep100);
         if (match == null) return null;
 
         int diameter = findDiameter(match);
         int step = findStep(match);
-        double weight = findWeight(match);
+        double weight = findWeight(match, slabLength, slabWidth, zoneName);
         double selectedArea = match.value;
 
         return new CalculationResult(requiredArea, selectedArea, diameter, step, weight, zoneName);

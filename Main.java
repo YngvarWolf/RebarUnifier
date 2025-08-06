@@ -27,11 +27,10 @@ public class Main {
         double topY = inPutTopY * (1 + percent / 100);
         double bottomY = inPutBottomY * (1 + percent / 100);
 
-        CalculationResult resultTopX = calculator.calculateResult(topX, "Верхняя арматура по X", useStepRounding);
-        CalculationResult resultBottomX = calculator.calculateResult(bottomX, "Нижняя арматура по X", useStepRounding);
-        CalculationResult resultTopY = calculator.calculateResult(topY, "Верхняя арматура по Y", useStepRounding);
-        CalculationResult resultBottomY = calculator.calculateResult(bottomY, "Нижняя арматура по Y", useStepRounding);
-
+        CalculationResult resultTopX = calculator.calculateResult(topX, "Верхняя арматура по X", useStepRounding, lengthPlate, widthPlate);
+        CalculationResult resultBottomX = calculator.calculateResult(bottomX, "Нижняя арматура по X", useStepRounding, lengthPlate, widthPlate);
+        CalculationResult resultTopY = calculator.calculateResult(topY, "Верхняя арматура по Y", useStepRounding, lengthPlate, widthPlate);
+        CalculationResult resultBottomY = calculator.calculateResult(bottomY, "Нижняя арматура по Y", useStepRounding, lengthPlate, widthPlate);
         output.printAllResults(resultTopX, resultBottomX, resultTopY, resultBottomY);
 
         boolean unificationRebar = input.getYesNo("Требуется ли унификация?");
@@ -41,14 +40,13 @@ public class Main {
 
         if (unificationRebar) {
             unificationByDiameter = input.getYesNo("Унификация по диаметру?");
-//            boolean unificationByStep = input.getYesNo("Унификация по шагу? (не реализовано)");
 
             if (unificationByDiameter) {
                 System.out.print("Унификация по арматуре: введите 'верх', 'низ' или 'всё': ");
                 unificationZoneChoice = scanner.next().trim().toLowerCase();
 
                 List<CalculationResult> unifiedResults =
-                        calculator.unifyResultsByDiameter(allResults, unificationZoneChoice);
+                        calculator.unifyResultsByDiameter(allResults, unificationZoneChoice, lengthPlate, widthPlate);
 
                 System.out.println("===== Результаты после унификации =====");
                 output.printAllResults(unifiedResults.toArray(new CalculationResult[0]));
@@ -60,9 +58,6 @@ public class Main {
                     resultBottomY = unifiedResults.get(3);
                 }
             }
-
-//            boolean useReinforcement = input.getYesNo("Требуется ли усиление?: ");
-//            double reinforcementPercent = useReinforcement ? input.getPercent("Процент усиления: ") : 0;
         }
     }
 }
